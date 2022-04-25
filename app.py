@@ -53,7 +53,7 @@ class Trader():
         self.model.add(Dense(1))
         self.model.compile(loss = 'mean_squared_error', optimizer = 'adam')
         self.model.summary()
-        callback = EarlyStopping(monitorw="val_loss", patience=10, verbose=1, mode="auto")
+        callback = EarlyStopping(monitor="val_loss", patience=10, verbose=1, mode="auto")
         self.model.fit(X_train, y_train, epochs=epoch, batch_size=1, callbacks=[callback], validation_data=(X_val, y_val))
 
 
@@ -84,15 +84,17 @@ class Trader():
     # predict
     def predict_action(self, data):
         # normalization
-        predict = predict.reshape(predict.shape[0],predict.shape[1],1)
-        value = self.model.predict(predict) # 預測隔天開盤價
+        _data = np.array([data])
+        _data = _data.reshape(_data.shape[0],_data.shape[1],1)
+        value = self.model.predict(_data) # 預測隔天開盤價
         if value >= 0:
             value -= 0.05
         else:
             value += 0.05
 
-        self.result.append(value[0]) # 紀錄預測結果
-        return action(value,predict)
+        self.predict_price.append(value[0]) # 紀錄預測結果
+        # 轉成 list 再回傳以便寫入 csv
+        return [self.action(value[0],data[0])]
 
 
 def load_data(file_name):
@@ -118,18 +120,16 @@ if __name__ == "__main__":
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
-    import math
-    
+    import csv
+    # make result predictable
     from numpy.random import seed
     seed(1)
     import tensorflow as tf
     tf.random.set_seed(1)
     from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import Dense
-    from tensorflow.keras.layers import SimpleRNN, GRU, LSTM
+    from tensorflow.keras.layers import Dense, LSTM
     from tensorflow.keras.callbacks import EarlyStopping
     from sklearn.preprocessing import MinMaxScaler
-    from sklearn.metrics import mean_squared_error
 
 
     training_data = load_data(args.training)
@@ -139,12 +139,12 @@ if __name__ == "__main__":
     testing_data = load_data(args.testing)
     testing_data = trader.normalize(testing_data) # normalize
     n = len(testing_data)
-    with open(args.output, "w") as output_file:
+    with open(args.output, "w", newline = '') as output_file:
+        writer = csv.writer(output_file)
         for i in range(n-1):
             # We will perform your action as the open price in the next day.
-            print(type(testing_data[i]))
             action = trader.predict_action(testing_data[i]) # 參數為當天的開高低收
-            output_file.write(action)
+            writer.writerow(action)
 
             # this is your option, you can leave it empty.
             # trader.re_training()
